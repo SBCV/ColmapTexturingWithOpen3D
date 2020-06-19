@@ -4,10 +4,10 @@ import numpy as np
 import open3d as o3d
 from PIL import Image as PILImage
 
-from ctm.ext.o3d.file import get_file_list
-from ctm.ext.colmap.read_dense import read_array as read_colmap_array
-from ctm.ext.colmap.read_write_model import read_model
-from ctm.conversion import convert_colmap_to_o3d_camera_trajectory
+from cto.ext.o3d.file import get_file_list
+from cto.ext.colmap.read_dense import read_array as read_colmap_array
+from cto.ext.colmap.read_write_model import read_model
+from cto.conversion import convert_colmap_to_o3d_camera_trajectory
 
 
 def parse_mesh(workspace):
@@ -85,7 +85,10 @@ def parse_colmap_rgb_and_depth_data(ordered_image_names, colmap_workspace, lazy=
     color_image_resized_fp_list = resize_images(
         color_image_ifp_list, depth_array_ifp_list, colmap_workspace.color_image_resized_dp, lazy)
 
-    depth_scale_value = compute_scaling_value(depth_array_ifp_list)
+    depth_map_min, depth_map_max = compute_depth_min_max(
+        depth_array_ifp_list)
+
+    depth_scale_value = compute_scaling_value(depth_map_min, depth_map_max)
 
     rgbd_images = []
     for color_image_resized_fp, depth_image_ifp in zip(
@@ -105,24 +108,23 @@ def parse_colmap_rgb_and_depth_data(ordered_image_names, colmap_workspace, lazy=
             depth_scale=depth_scale_value,
             convert_rgb_to_intensity=False)
 
+        print("max bound", rgbd_image.get_max_bound())
         rgbd_images.append(rgbd_image)
 
     return rgbd_images
 
 
-def compute_scaling_value(depth_array_ifp_list):
-
-    depth_map_min, depth_map_max = compute_depth_min_max(
-        depth_array_ifp_list)
+def compute_scaling_value(depth_map_min, depth_map_max):
 
     # https://docs.scipy.org/doc/numpy-1.13.0/user/basics.types.html
     #   An uint16 can store up to 65535 values
     depth_map_max_possible_value = 65535.0
-    depth_scale_value = compute_best_scaling_value(
-        depth_map_min,
-        depth_map_max,
-        depth_map_max_possible_value)
 
+    assert depth_map_min >= 0.0
+    depth_scale_value = depth_map_max_possible_value / depth_map_max
+    depth_scale_value = float(math.floor(depth_scale_value))
+    print('depth_scale_value:', depth_scale_value)
+    assert depth_map_max * depth_scale_value < depth_map_max_possible_value
     return depth_scale_value
 
 
@@ -139,16 +141,6 @@ def compute_depth_min_max(depth_array_ifp_list):
     # > Depth Value Range (colmap): min: 0.0 max: 50.510017
     print('Depth Value Range (colmap):', "min:", depth_map_min, "max:", depth_map_max)
     return depth_map_min, depth_map_max
-
-
-def compute_best_scaling_value(depth_map_min, depth_map_max, depth_map_max_possible_value):
-
-    assert depth_map_min >= 0.0
-    depth_scale_value = depth_map_max_possible_value / depth_map_max
-    depth_scale_value = float(math.floor(depth_scale_value))
-    print('depth_scale_value:', depth_scale_value)
-    assert depth_map_max * depth_scale_value < depth_map_max_possible_value
-    return depth_scale_value
 
 
 def resize_images(color_image_ifp_list, depth_array_ifp_list, color_image_resized_dp, lazy):
