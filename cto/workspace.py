@@ -7,7 +7,7 @@ class ColmapWorkspace(object):
         self.model_idp = os.path.join(colmap_dataset_idp, "sparse")
         self.depth_image_idp = os.path.join(colmap_dataset_idp, "stereo", "depth_maps")
         self.color_image_idp = os.path.join(colmap_dataset_idp, "images")
-        self.color_image_resized_dp = os.path.join(colmap_dataset_idp, "images_resized")
+        self.color_image_resized_dp = os.path.join(colmap_dataset_idp, "images_resized_cto")
 
         if use_poisson:
             self.mesh_ifp = os.path.join(colmap_dataset_idp, "meshed-poisson.ply")

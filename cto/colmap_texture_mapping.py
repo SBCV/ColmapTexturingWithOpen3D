@@ -11,6 +11,7 @@ import open3d as o3d
 import os
 
 from cto.data_parsing import parse_mesh
+from cto.data_parsing import resize_images
 from cto.data_parsing import parse_colmap_camera_trajectory
 from cto.data_parsing import parse_colmap_rgb_and_depth_data
 from cto.data_parsing import parse_o3d_trajectory
@@ -22,9 +23,23 @@ from cto.utility.logging_extension import logger
 from cto.visualization import visualize_rgbd_image_list
 
 
-class Settings(Enum):
+class ReconstructionMode(Enum):
     Open3D = 'Open3D'
     Colamp = 'Colmap'
+
+
+def get_reconstruction_mode(config):
+    reconstruction_mode = config.get_option_value('reconstruction_mode', target_type=str)
+    assert reconstruction_mode in [ReconstructionMode.Open3D.value, ReconstructionMode.Colamp.value]
+    return reconstruction_mode
+
+
+def get_dataset_idp(config):
+    reconstruction_mode = get_reconstruction_mode(config)
+    dataset_idp = config.get_option_value(
+        'dataset_idp', target_type=str, section=reconstruction_mode)
+    logger.vinfo('dataset_idp', dataset_idp)
+    return dataset_idp
 
 
 def create_config():
@@ -39,23 +54,29 @@ def create_config():
 
 
 def compute_ofp(config):
+    dataset_idp = get_dataset_idp(config)
+    reconstruction_mode = get_reconstruction_mode(config)
     mesh_textured_max_iter_x_ofn = config.get_option_value(
         'mesh_textured_max_iter_x_ofn', target_type=str)
     maximum_iteration = config.get_option_value(
-        'maximum_iteration', target_type=int, section=settings)
+        'maximum_iteration', target_type=int, section=reconstruction_mode)
     mesh_textured_max_iter_x_ofn = mesh_textured_max_iter_x_ofn.replace('_x.', '_' + str(maximum_iteration) + '.')
     return os.path.join(dataset_idp, mesh_textured_max_iter_x_ofn)
 
 
-def import_reconstruction(settings):
-    if settings.lower() == 'colmap':
+def import_reconstruction(config):
+    dataset_idp = get_dataset_idp(config)
+    reconstruction_mode = get_reconstruction_mode(config)
+    if reconstruction_mode.lower() == 'colmap':
         colmap_workspace = ColmapWorkspace(
             dataset_idp, use_geometric_depth_maps=True, use_poisson=True)
-        camera_trajectory, ordered_image_names = parse_colmap_camera_trajectory(colmap_workspace)
+        resize_images(colmap_workspace, lazy=True)
+        camera_trajectory, ordered_image_names = parse_colmap_camera_trajectory(
+            colmap_workspace)
         rgbd_images = parse_colmap_rgb_and_depth_data(
-            ordered_image_names, colmap_workspace, lazy=True)
+            ordered_image_names, colmap_workspace)
         mesh = parse_mesh(colmap_workspace)
-    elif settings.lower() == 'open3d':
+    elif reconstruction_mode.lower() == 'open3d':
         o3d_workspace = O3DWorkspace(dataset_idp)
         camera_trajectory = parse_o3d_trajectory(o3d_workspace)
         rgbd_images = parse_o3d_data(o3d_workspace)
@@ -65,7 +86,7 @@ def import_reconstruction(settings):
     return rgbd_images, camera_trajectory, mesh
 
 
-def visualize_intermediate_result(config, rgbd_images, camera_trajectory, mesh):
+def visualize_intermediate_result(rgbd_images, camera_trajectory, mesh, config):
     viz_im_points = config.get_option_value('visualize_intermediate_points', target_type=bool)
     viz_im_mesh = config.get_option_value('visualize_intermediate_mesh', target_type=bool)
     if viz_im_points or viz_im_mesh:
@@ -84,10 +105,8 @@ def color_map_optimization(mesh,
                            camera_trajectory,
                            ofp,
                            config,
-                           settings,
                            maximum_iteration=None):
-
-    assert settings in [Settings.Open3D.value, Settings.Colamp.value]
+    reconstruction_mode = get_reconstruction_mode(config)
 
     # Optimize texture and save the mesh as texture_mapped.ply
     # This is implementation of following paper: "Q.-Y. Zhou and V. Koltun,
@@ -104,15 +123,15 @@ def color_map_optimization(mesh,
 
     option = o3d.color_map.ColorMapOptimizationOption()
     option.non_rigid_camera_coordinate = config.get_option_value(
-        'non_rigid_camera_coordinate', target_type=bool, section=settings)
+        'non_rigid_camera_coordinate', target_type=bool, section=reconstruction_mode)
     option.maximum_allowable_depth = config.get_option_value(
-        'maximum_allowable_depth', target_type=float, section=settings)
+        'maximum_allowable_depth', target_type=float, section=reconstruction_mode)
 
     if maximum_iteration is not None:
         option.maximum_iteration = maximum_iteration
     else:
         option.maximum_iteration = config.get_option_value(
-            'maximum_iteration', target_type=int, section=settings)
+            'maximum_iteration', target_type=int, section=reconstruction_mode)
 
     with o3d.utility.VerbosityContextManager(o3d.utility.VerbosityLevel.Debug) as cm:
         o3d.color_map.color_map_optimization(mesh, rgbd_images, camera_trajectory, option)
@@ -129,27 +148,15 @@ if __name__ == "__main__":
         o3d.utility.VerbosityLevel.Debug)
 
     config = create_config()
-    settings = config.get_option_value('settings', target_type=str)
-    dataset_idp = config.get_option_value(
-        'dataset_idp', target_type=str, section=settings)
-    logger.vinfo('dataset_idp', dataset_idp)
-
     mesh_textured_max_iter_x_ofp = compute_ofp(config)
+    rgbd_images, camera_trajectory, mesh = import_reconstruction(config)
 
-    rgbd_images, camera_trajectory, mesh = import_reconstruction(settings)
-
-    # TODO HANDLE DOWNSCALED IMAGES
-    # for parameters in camera_trajectory.parameters:
-    #     print(parameters.intrinsic)
-    #     print(parameters.intrinsic.intrinsic_matrix)
-
-    visualize_intermediate_result(config, rgbd_images, camera_trajectory, mesh)
+    visualize_intermediate_result(rgbd_images, camera_trajectory, mesh, config)
 
     color_map_optimization(
         mesh,
         rgbd_images,
         camera_trajectory,
         ofp=mesh_textured_max_iter_x_ofp,
-        config=config,
-        settings=settings)
+        config=config)
 

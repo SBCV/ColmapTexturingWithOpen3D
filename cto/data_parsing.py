@@ -8,6 +8,7 @@ from cto.ext.o3d.file import get_file_list
 from cto.ext.colmap.read_dense import read_array as read_colmap_array
 from cto.ext.colmap.read_write_model import read_model
 from cto.conversion import convert_colmap_to_o3d_camera_trajectory
+from cto.utility.os_extension import get_corresponding_files_in_directories
 
 
 def parse_mesh(workspace):
@@ -67,23 +68,30 @@ def parse_colmap_camera_trajectory(colmap_workspace):
 
     colmap_camera_parameter_dict, colmap_image_parameter_dict, points3D_dict = read_model(
         colmap_workspace.model_idp, ext='.bin')
-
     camera_trajectory, ordered_image_names = convert_colmap_to_o3d_camera_trajectory(
-        colmap_camera_parameter_dict, colmap_image_parameter_dict)
+        colmap_camera_parameter_dict, colmap_image_parameter_dict, colmap_workspace)
     return camera_trajectory, ordered_image_names
 
 
-def parse_colmap_rgb_and_depth_data(ordered_image_names, colmap_workspace, lazy=False):
-    color_image_ifp_list = []
+def get_resized_image_fp_s(ordered_image_names, colmap_workspace):
+    color_image_resized_fp_list = []
+    for image_name in ordered_image_names:
+        color_image_resized_fp_list.append(
+            os.path.join(colmap_workspace.color_image_resized_dp, image_name))
+    return color_image_resized_fp_list
+
+
+def get_depth_array_fp_s(ordered_image_names, colmap_workspace):
     depth_array_ifp_list = []
     for image_name in ordered_image_names:
-        color_image_ifp_list.append(
-            os.path.join(colmap_workspace.color_image_idp, image_name))
         depth_array_ifp_list.append(
             os.path.join(colmap_workspace.depth_image_idp, image_name + colmap_workspace.depth_map_suffix))
+    return depth_array_ifp_list
 
-    color_image_resized_fp_list = resize_images(
-        color_image_ifp_list, depth_array_ifp_list, colmap_workspace.color_image_resized_dp, lazy)
+
+def parse_colmap_rgb_and_depth_data(ordered_image_names, colmap_workspace):
+    color_image_resized_fp_list = get_resized_image_fp_s(ordered_image_names, colmap_workspace)
+    depth_array_ifp_list = get_depth_array_fp_s(ordered_image_names, colmap_workspace)
 
     depth_map_min, depth_map_max = compute_depth_min_max(
         depth_array_ifp_list)
@@ -143,9 +151,15 @@ def compute_depth_min_max(depth_array_ifp_list):
     return depth_map_min, depth_map_max
 
 
-def resize_images(color_image_ifp_list, depth_array_ifp_list, color_image_resized_dp, lazy):
+def resize_images(colmap_workspace, lazy):
+
+    color_image_ifp_list, depth_array_ifp_list = get_corresponding_files_in_directories(
+        colmap_workspace.color_image_idp,
+        colmap_workspace.depth_image_idp,
+        suffix_2=colmap_workspace.depth_map_suffix)
+
+    color_image_resized_dp = colmap_workspace.color_image_resized_dp
     mkdir_safely(color_image_resized_dp)
-    color_image_resized_fp_list = []
     for color_image_ifp, depth_image_ifp in zip(color_image_ifp_list, depth_array_ifp_list):
         color_image_resized_fp = os.path.join(
             color_image_resized_dp, os.path.basename(color_image_ifp))
@@ -157,10 +171,7 @@ def resize_images(color_image_ifp_list, depth_array_ifp_list, color_image_resize
                 color_image_ifp,
                 width,
                 height,
-                color_image_resized_fp
-            )
-        color_image_resized_fp_list.append(color_image_resized_fp)
-    return color_image_resized_fp_list
+                color_image_resized_fp)
 
 
 def write_resized_image_to_disc(ifp, new_width, new_height, ofp):
