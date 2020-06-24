@@ -1,3 +1,5 @@
 .idea/*
 *.pyc
 cto/configs/cto.cfg
+TestData/
+cto/debug

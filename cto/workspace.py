@@ -6,6 +6,8 @@ class ColmapWorkspace(object):
     def __init__(self, colmap_dataset_idp, use_geometric_depth_maps=True, use_poisson=True):
         self.model_idp = os.path.join(colmap_dataset_idp, "sparse")
         self.depth_image_idp = os.path.join(colmap_dataset_idp, "stereo", "depth_maps")
+        self.depth_image_from_mesh_dp = os.path.join(colmap_dataset_idp, "depth_maps_from_mesh")
+
         self.color_image_idp = os.path.join(colmap_dataset_idp, "images")
         self.color_image_resized_dp = os.path.join(colmap_dataset_idp, "images_resized_cto")
 
@@ -13,11 +15,14 @@ class ColmapWorkspace(object):
             self.mesh_ifp = os.path.join(colmap_dataset_idp, "meshed-poisson.ply")
         else:
             self.mesh_ifp = os.path.join(colmap_dataset_idp, "meshed-delaunay.ply")
+        assert os.path.isfile(self.mesh_ifp)
 
         if use_geometric_depth_maps:
             self.depth_map_suffix = ".geometric.bin"
         else:
             self.depth_map_suffix = ".photometric.bin"
+
+        self.depth_from_mesh_suffix = '.npy'
 
 
 class O3DWorkspace(object):

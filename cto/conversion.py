@@ -2,6 +2,28 @@ import os
 from PIL import Image
 import open3d as o3d
 import numpy as np
+from cto.ext.colmap.read_dense import read_array as read_colmap_array
+# from cto.data_parsing.colmap_parsing import get_colmap_depth_map_size
+
+
+def get_colmap_depth_map_size(path):
+    with open(path, "rb") as fid:
+        width, height, channels = np.genfromtxt(
+            fid, delimiter="&", max_rows=1, usecols=(0, 1, 2), dtype=int)
+    return height, width
+
+
+def convert_color_depth_to_rgbd(color,
+                                depth,
+                                depth_scale=1.0,
+                                depth_trunc=float('inf'),
+                                convert_rgb_to_intensity=False):
+    return o3d.geometry.RGBDImage.create_from_color_and_depth(
+        color,
+        depth,
+        depth_scale=depth_scale,
+        depth_trunc=depth_trunc,
+        convert_rgb_to_intensity=convert_rgb_to_intensity)
 
 
 def scale_camera(f_x, f_y, c_x, c_y, width_original, height_original, width_resized, height_resized):
@@ -81,9 +103,8 @@ def convert_colmap_to_o3d_intrinsics(colmap_camera, image_params, colmap_workspa
     width_original = colmap_camera.width
     height_original = colmap_camera.height
 
-    image_resized_fp = os.path.join(colmap_workspace.color_image_resized_dp, image_params.name)
-    image_resized = Image.open(image_resized_fp)
-    width_resized, height_resized = image_resized.size
+    depth_map_fp = os.path.join(colmap_workspace.depth_image_idp, image_params.name + colmap_workspace.depth_map_suffix)
+    height_resized, width_resized = get_colmap_depth_map_size(depth_map_fp)
 
     params = colmap_camera.params
     if colmap_camera.model == 'PINHOLE':
@@ -92,24 +113,28 @@ def convert_colmap_to_o3d_intrinsics(colmap_camera, image_params, colmap_workspa
         c_x = params[2]
         c_y = params[3]
         skew = 0
-
-        c_x, c_y, f_x, f_y, width, height = scale_camera(
-            f_x, f_y,
-            c_x, c_y,
-            width_original, height_original,
-            width_resized, height_resized)
-
-        o3d_camera_intrinsics.width = width_resized
-        o3d_camera_intrinsics.height = height_resized
-        o3d_camera_intrinsics.intrinsic_matrix = np.array(
-            [[f_x, skew, c_x],
-             [0, f_y, c_y],
-             [0, 0, 1]],
-            dtype=float)
-        print('intrinsic_matrix')
-        print(o3d_camera_intrinsics.intrinsic_matrix)
+    elif colmap_camera.model == 'PERSPECTIVE':
+        f_x = params[0]
+        f_y = params[1]
+        c_x = params[2]
+        c_y = params[3]
+        skew = params[4]
     else:
         assert False
+
+    c_x, c_y, f_x, f_y, width, height = scale_camera(
+        f_x, f_y,
+        c_x, c_y,
+        width_original, height_original,
+        width_resized, height_resized)
+
+    o3d_camera_intrinsics.width = width_resized
+    o3d_camera_intrinsics.height = height_resized
+    o3d_camera_intrinsics.intrinsic_matrix = np.array(
+        [[f_x, skew, c_x],
+         [0, f_y, c_y],
+         [0, 0, 1]],
+        dtype=float)
 
     return o3d_camera_intrinsics
 

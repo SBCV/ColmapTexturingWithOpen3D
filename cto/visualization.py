@@ -12,7 +12,7 @@ def visualize_rgbd_image_list(rgbd_image_list, camera_trajectory, num_images=Non
     camera_parameter_list = camera_trajectory.parameters
     assert len(rgbd_image_list) == len(camera_parameter_list)
 
-    if num_images is None:
+    if num_images is None or num_images == -1:
         num_images = len(rgbd_image_list)
 
     point_cloud_list = []
@@ -28,4 +28,22 @@ def visualize_rgbd_image_list(rgbd_image_list, camera_trajectory, num_images=Non
 
     print("Drawing " + str(num_images) + " images.")
     o3d.visualization.draw_geometries(point_cloud_list)
+
+
+def visualize_intermediate_result(rgbd_images, camera_trajectory, mesh, config):
+    viz_im_points = config.get_option_value('visualize_intermediate_points', target_type=bool)
+    viz_im_mesh = config.get_option_value('visualize_intermediate_mesh', target_type=bool)
+
+    viz_im_num_cam = config.get_option_value('visualize_intermediate_num_cameras', target_type=int)
+    if viz_im_points or viz_im_mesh:
+        if viz_im_mesh:
+            additional_point_cloud_list = [mesh]
+        else:
+            additional_point_cloud_list = []
+        visualize_rgbd_image_list(
+            rgbd_images,
+            camera_trajectory,
+            num_images=viz_im_num_cam,
+            additional_point_cloud_list=additional_point_cloud_list)
+
 
