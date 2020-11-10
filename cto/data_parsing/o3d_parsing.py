@@ -13,11 +13,11 @@ def parse_o3d_trajectory(o3d_workspace):
 
 def parse_o3d_data(o3d_workspace):
 
-    depth_image_ifp_list = get_file_list(
-        o3d_workspace.depth_image_idp, extension=".png")
+    depth_map_ifp_list = get_file_list(
+        o3d_workspace.depth_map_idp, extension=".png")
     color_image_ifp_list = get_file_list(
         o3d_workspace.color_image_idp, extension=".jpg")
-    assert (len(depth_image_ifp_list) == len(color_image_ifp_list))
+    assert (len(depth_map_ifp_list) == len(color_image_ifp_list))
 
     # Read RGBD images
     rgbd_images = []
@@ -25,8 +25,8 @@ def parse_o3d_data(o3d_workspace):
     # Determine value range
     depth_map_min = float('inf')
     depth_map_max = -float('inf')
-    for i in range(len(depth_image_ifp_list)):
-        depth = o3d.io.read_image(os.path.join(depth_image_ifp_list[i]))
+    for i in range(len(depth_map_ifp_list)):
+        depth = o3d.io.read_image(os.path.join(depth_map_ifp_list[i]))
         color = o3d.io.read_image(os.path.join(color_image_ifp_list[i]))
 
         depth_map_min = min(depth_map_min, np.amin(depth))

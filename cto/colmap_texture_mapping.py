@@ -9,7 +9,7 @@ import open3d as o3d
 from cto.utility.logging_extension import logger
 from cto.visualization import visualize_intermediate_result
 from cto.config_api import create_config
-from cto.config_api import compute_ofp
+from cto.config_api import get_ofp
 from cto.color_optimization import color_map_optimization
 from cto.data_parsing.reconstruction_parsing import import_reconstruction
 
@@ -23,8 +23,8 @@ if __name__ == "__main__":
         o3d.utility.VerbosityLevel.Debug)
 
     config = create_config()
-    mesh_textured_max_iter_x_ofp = compute_ofp(config)
-    rgbd_images, camera_trajectory, mesh, depth_map_max = import_reconstruction(config)
+    mesh_textured_max_iter_x_ofp = get_ofp(config)
+    rgbd_images, camera_trajectory, mesh, depth_range = import_reconstruction(config)
 
     visualize_intermediate_result(rgbd_images, camera_trajectory, mesh, config)
 
@@ -34,5 +34,5 @@ if __name__ == "__main__":
         camera_trajectory,
         ofp=mesh_textured_max_iter_x_ofp,
         config=config,
-        maximum_allowable_depth=depth_map_max)
+        depth_range=depth_range)
 

@@ -103,7 +103,7 @@ def convert_colmap_to_o3d_intrinsics(colmap_camera, image_params, colmap_workspa
     width_original = colmap_camera.width
     height_original = colmap_camera.height
 
-    depth_map_fp = os.path.join(colmap_workspace.depth_image_idp, image_params.name + colmap_workspace.depth_map_suffix)
+    depth_map_fp = os.path.join(colmap_workspace.depth_map_idp, image_params.name + colmap_workspace.depth_map_suffix)
     height_resized, width_resized = get_colmap_depth_map_size(depth_map_fp)
 
     params = colmap_camera.params

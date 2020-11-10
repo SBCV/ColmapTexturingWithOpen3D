@@ -32,15 +32,16 @@ def import_reconstruction(config):
 
         mesh = parse_mesh(colmap_workspace)
 
-        rgbd_images, depth_map_max = parse_colmap_rgb_and_depth_data(
-            camera_trajectory, ordered_image_names, mesh, colmap_workspace, config)
+        rgbd_images, depth_map_range = parse_colmap_rgb_and_depth_data(
+            camera_trajectory, ordered_image_names, colmap_workspace, config)
 
     elif reconstruction_mode.lower() == 'open3d':
         o3d_workspace = O3DWorkspace(dataset_idp)
         camera_trajectory = parse_o3d_trajectory(o3d_workspace)
         rgbd_images = parse_o3d_data(o3d_workspace)
         mesh = parse_mesh(o3d_workspace)
-        depth_map_max = None
+        depth_map_range = None
     else:
         assert False
-    return rgbd_images, camera_trajectory, mesh, depth_map_max
+    return rgbd_images, camera_trajectory, mesh, depth_map_range
+
